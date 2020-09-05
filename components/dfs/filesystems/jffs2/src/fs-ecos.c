@@ -1868,7 +1868,6 @@ int jffs2_oflag_to_accmode(int oflags)
 static unsigned int CheckPermission(struct _inode *node, int accMode)
 {
 	uint uid = OsCurrUserGet()->effUserID;
-
 	mode_t file_mode = node->i_mode;
 
 	if (uid == node->i_uid) {
@@ -1883,18 +1882,27 @@ static unsigned int CheckPermission(struct _inode *node, int accMode)
 		return 0;
 	}
 
-	if (!(accMode & EXEC_OP) || (node->i_mode & S_IXUGO) || S_ISDIR(node->i_mode)) {
-		if (IsCapPermit(CAPABILITY_DAC_OVERRIDE)) {
-			D1(PRINTK("CAPABILITY OVER RIDE\n"));
-			return 0;
+	file_mode = 0;
+	if (S_ISDIR(node->i_mode)) {
+		if ((accMode & EXEC_OP) && (IsCapPermit(CAP_DAC_READ_SEARCH))) {
+			file_mode |= EXEC_OP;
+		}
+	} else {
+		if ((accMode & EXEC_OP) && (IsCapPermit(CAP_DAC_EXECUTE)) && (node->i_mode & S_IXUGO)) {
+			file_mode |= EXEC_OP;
 		}
 	}
 
-	if ((accMode == READ_OP) || (S_ISDIR(node->i_mode) && !(accMode & WRITE_OP))) {
-		if (IsCapPermit(CAPABILITY_DAC_READ_SEARCH)) {
-			D1(PRINTK("CAPABILITY READ OVER RIDE\n"));
-			return 0;
-		}
+	if ((accMode & WRITE_OP) && IsCapPermit(CAP_DAC_WRITE)) {
+		file_mode |= WRITE_OP;
+	}
+
+	if ((accMode & READ_OP) && IsCapPermit(CAP_DAC_READ_SEARCH)) {
+		file_mode |= READ_OP;
+	}
+
+	if ((accMode & file_mode) == accMode) {
+		return 0;
 	}
 
 	D1(PRINTK("%s, %d, permission check fail,uid %d, gid %d, mode %d, accMode %d, cuid %d\n",
@@ -1916,7 +1924,7 @@ static int check_to_setattr(struct jffs2_raw_inode *ri, struct jffs2_inode_info 
 	ri->gid = cpu_to_je16(node->i_gid);
 	tmp_mode = node->i_mode;
 	if (valid & CHG_UID) {
-		if (((c_uid != node->i_uid) || (attr->attr_chg_uid != node->i_uid)) && (!IsCapPermit(CAPABILITY_CHOWN))) {
+		if (((c_uid != node->i_uid) || (attr->attr_chg_uid != node->i_uid)) && (!IsCapPermit(CAP_CHOWN))) {
 			return -EPERM;
 		} else {
 			ri->uid = cpu_to_je16(attr->attr_chg_uid);
@@ -1924,7 +1932,7 @@ static int check_to_setattr(struct jffs2_raw_inode *ri, struct jffs2_inode_info 
 	}
 
 	if (valid & CHG_GID) {
-		if (((c_gid != node->i_gid) || (attr->attr_chg_gid != node->i_gid)) && (!IsCapPermit(CAPABILITY_CHOWN))) {
+		if (((c_gid != node->i_gid) || (attr->attr_chg_gid != node->i_gid)) && (!IsCapPermit(CAP_CHOWN))) {
 			return -EPERM;
 		} else {
 			ri->gid = cpu_to_je16(attr->attr_chg_gid);
@@ -1932,7 +1940,7 @@ static int check_to_setattr(struct jffs2_raw_inode *ri, struct jffs2_inode_info 
 	}
 
 	if (valid & CHG_MODE) {
-		if (!IsCapPermit(CAPABILITY_FOWNER) && (c_uid != node->i_uid)) {
+		if (!IsCapPermit(CAP_FOWNER) && (c_uid != node->i_uid)) {
 			return -EPERM;
 		} else {
 			attr->attr_chg_mode  &= ~S_IFMT; // delete file type
