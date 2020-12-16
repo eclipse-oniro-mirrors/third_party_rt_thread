@@ -24,7 +24,9 @@
 #include "jffs2/compr.h"
 #include "port/fcntl.h"
 #include "porting.h"
+#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
 #include "spinor.h"
+#endif
 #include "limits.h"
 #include "los_process_pri.h"
 #include "capability_type.h"
@@ -354,7 +356,11 @@ static int jffs2_mount(cyg_mtab_entry *mte, int partition_num)
 		if (current_node->patitionnum == partition_num)
 			break;
 	}
+#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
 	spinor_mtd = GetMtd("spinor");
+#else
+	spinor_mtd = (struct MtdDev *)LOS_DL_LIST_ENTRY(patition_head->pstNext, mtd_partition, node_info)->mtd_info;
+#endif
 	if (spinor_mtd == NULL) {
 		free(jffs2_sb);
 		return EPERM;
@@ -362,7 +368,9 @@ static int jffs2_mount(cyg_mtab_entry *mte, int partition_num)
 	jffs_part[partition_num].blockEnd = current_node->end_block;
 	jffs_part[partition_num].blockSize = spinor_mtd->eraseSize;
 	jffs_part[partition_num].blockStart = current_node->start_block;
+#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
 	(void)FreeMtd(spinor_mtd);
+#endif
 	jffs2_sb->jffs2_sb.mtd = current_node->mtd_info;
 	jffs2_sb->s_dev = (cyg_io_handle_t)(&jffs_part[partition_num]);
 
