@@ -24,7 +24,9 @@
 #include "errno.h"
 #include "jffs2_fs_i.h"
 #include "jffs2_fs_sb.h"
+#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
 #include "spinor.h"
+#endif
 #include "fileio.h"
 #include "sys/uio.h"
 

@@ -1,7 +1,9 @@
 #ifndef JFFS2_CONFIG_H
 #define JFFS2_CONFIG_H
 
+#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
 #include "spinor.h"
+#endif
 #include "mtd_partition.h"
 
 #ifdef __cplusplus
