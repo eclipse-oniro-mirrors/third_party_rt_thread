@@ -293,19 +293,19 @@ static loff_t vfs_jffs_seek64(FAR struct file *filep, loff_t offset, int whence)
 
 static int vfs_jffs_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 {
-	PRINT_ERR("%s NOT SUPPORT\n", __FUNCTION__);
+	PRINT_DEBUG("%s NOT SUPPORT\n", __FUNCTION__);
 	return -ENOSYS;
 }
 
 static int vfs_jffs_sync(FAR struct file *filep)
 {
-	PRINT_ERR("%s NOT SUPPORT\n", __FUNCTION__);
+	PRINT_DEBUG("%s NOT SUPPORT\n", __FUNCTION__);
 	return -ENOSYS;
 }
 
 static int vfs_jffs_dup(FAR const struct file *oldp, FAR struct file *newp)
 {
-	PRINT_ERR("%s NOT SUPPORT\n", __FUNCTION__);
+	PRINT_DEBUG("%s NOT SUPPORT\n", __FUNCTION__);
 	return -ENOSYS;
 }
 
@@ -363,45 +363,49 @@ static int vfs_jffs_closedir(FAR struct inode *mountpt, FAR struct fs_dirent_s *
 
 static int vfs_jffs_readdir(FAR struct inode *mountpt, FAR struct fs_dirent_s *dir)
 {
-/* reduced value between dir->fd_dir.d_off and jffs2_file->f_offset */
-#define REDUCED_VALUE    3
 	cyg_file *jffs2_file = NULL;
 	struct CYG_UIO_TAG uio_s;
 	struct CYG_IOVEC_TAG iovec;
 	struct jffs2_dirent jffs2_d;
 	int result;
+	int i = 0;
 	uint32_t dst_name_size;
 
 	jffs2_file = (cyg_file *)(dir->u.fs_dir);
 
-	/* set jffs2_d */
-	(void)memset_s(&jffs2_d, sizeof(struct jffs2_dirent), 0, sizeof(struct jffs2_dirent));
-	/* set CYG_UIO_TAG uio_s */
-	uio_s.uio_iov = &iovec;
-	uio_s.uio_iov->iov_base = &jffs2_d;
-	uio_s.uio_iov->iov_len = sizeof(struct jffs2_dirent);;
-	uio_s.uio_iovcnt = 1; /* must be 1 */
-	uio_s.uio_offset = 0; /* not used... */
-	uio_s.uio_resid = uio_s.uio_iov->iov_len; /* seem no use in jffs2; */
+	while (i < MAX_DIRENT_NUM && i < dir->read_cnt) {
+		/* set jffs2_d */
+		(void)memset_s(&jffs2_d, sizeof(struct jffs2_dirent), 0, sizeof(struct jffs2_dirent));
+		/* set CYG_UIO_TAG uio_s */
+		uio_s.uio_iov = &iovec;
+		uio_s.uio_iov->iov_base = &jffs2_d;
+		uio_s.uio_iov->iov_len = sizeof(struct jffs2_dirent);;
+		uio_s.uio_iovcnt = 1; /* must be 1 */
+		uio_s.uio_offset = 0; /* not used... */
+		uio_s.uio_resid = uio_s.uio_iov->iov_len; /* seem no use in jffs2; */
 
-	jffs_mutex_take(&jffs2_lock, (uint32_t)JFFS_WAITING_FOREVER);
-	result = jffs2_dir_operations.readdir(jffs2_file, &uio_s);
-	jffs_mutex_release(&jffs2_lock);
+		jffs_mutex_take(&jffs2_lock, (uint32_t)JFFS_WAITING_FOREVER);
+		result = jffs2_dir_operations.readdir(jffs2_file, &uio_s);
+		jffs_mutex_release(&jffs2_lock);
 
-	if (result)
-		return jffs2_result_to_vfs(result);
+		if (result) {
+			break;
+		}
 
-	dir->fd_dir.d_off = jffs2_file->f_offset - REDUCED_VALUE;
-	dir->fd_dir.d_type = jffs2_d.d_type;
-	dir->fd_dir.d_reclen = (uint16_t)sizeof(struct dirent);
-	dst_name_size = sizeof(dir->fd_dir.d_name);
-	result = strncpy_s(dir->fd_dir.d_name, dst_name_size, jffs2_d.d_name, dst_name_size - 1);
-	if (result != EOK) {
-		return -ENAMETOOLONG;
+		dir->fd_dir[i].d_type = jffs2_d.d_type;
+		dst_name_size = sizeof(dir->fd_dir[i].d_name);
+		result = strncpy_s(dir->fd_dir[i].d_name, dst_name_size, jffs2_d.d_name, dst_name_size - 1);
+		if (result != EOK) {
+			return -ENAMETOOLONG;
+		}
+		dir->fd_dir[i].d_name[dst_name_size - 1] = '\0';
+		dir->fd_position++;
+		dir->fd_dir[i].d_off = dir->fd_position;
+		dir->fd_dir[i].d_reclen = (uint16_t)sizeof(struct dirent);
+
+		i++;
 	}
-	dir->fd_dir.d_name[dst_name_size - 1] = '\0';
-
-	return OK;
+	return i;
 }
 
 static int vfs_jffs_rewinddir(FAR struct inode *mountpt,
@@ -620,6 +624,7 @@ static int vfs_jffs_statfs(FAR struct inode *mountpt, FAR struct statfs *buf)
 	buf->f_frsize = BLOCK_SIZE;
 	buf->f_files = 0;
 	buf->f_ffree = 0;
+	buf->f_flags = mountpt->mountflags;
 	return 0;
 }
 

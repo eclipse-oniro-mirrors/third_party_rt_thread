@@ -24,9 +24,6 @@
 #include "jffs2/compr.h"
 #include "port/fcntl.h"
 #include "porting.h"
-#ifndef LOSCFG_PLATFORM_QEMU_ARM_VIRT_CA7
-#include "spinor.h"
-#endif
 #include "limits.h"
 #include "los_process_pri.h"
 #include "capability_type.h"
@@ -166,7 +163,7 @@ static int find_entry(jffs2_dirsearch * ds)
 	struct _inode *dir = ds->dir;
 	const unsigned char *name = ds->path;
 	const unsigned char *n = name;
-	char namelen = 0;
+	int namelen = 0;
 	struct _inode *d;
 	int accMode = 0;
 
@@ -1418,7 +1415,6 @@ static int jffs2_fo_dirread(struct CYG_FILE_TAG *fp, struct CYG_UIO_TAG *uio)
       out_sem:
 	mutex_unlock(&f->sem);
 	if (fd == NULL) {
-		fp->f_offset = 2;
 		D2(printk
 			(KERN_DEBUG "reached the end of the directory\n"));
 		return ENOENT;
