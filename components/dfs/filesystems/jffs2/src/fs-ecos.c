@@ -1161,7 +1161,7 @@ static int jffs2_fo_write(struct CYG_FILE_TAG *fp, struct CYG_UIO_TAG *uio)
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
 	int i;
 
-#if (LOSCFG_KERNEL_SMP == YES)
+#ifdef LOSCFG_KERNEL_SMP
 	struct super_block *sb = inode->i_sb;
 	UINT16 gc_cpu_mask = LOS_TaskCpuAffiGet(sb->s_gc_thread);
 	UINT32 cur_task_id = LOS_CurTaskIDGet();
